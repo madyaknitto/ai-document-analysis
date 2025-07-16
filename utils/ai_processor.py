@@ -1,7 +1,5 @@
-import google.generativeai as genai
-from google.generativeai.generative_models import GenerativeModel
-from google.generativeai.client import configure
-from google.generativeai.embedding import embed_content
+import google.genai as genai
+from google.genai import Client
 from config import Config
 import time
 import base64
@@ -11,41 +9,33 @@ import json
 
 class GeminiProcessor:
     def __init__(self):
-        self.configure_gemini()
-        self.model = None
-        self.embedding_model = None
-        self.initialize_models()
+        self.client = None
+        self.initialize_client()
     
-    def configure_gemini(self):
-        """Configure Gemini API"""
+    def initialize_client(self):
+        """Initialize Gemini client"""
         try:
-            configure(api_key=Config.GEMINI_API_KEY)
-            print("Gemini API configured successfully")
+            self.client = Client(
+                api_key=Config.GEMINI_API_KEY,
+                http_options={'api_version': 'v1beta'}
+            )
+            print("Gemini client initialized successfully")
         except Exception as e:
-            print(f"Error configuring Gemini API: {e}")
-            raise e
-    
-    def initialize_models(self):
-        """Initialize Gemini models"""
-        try:
-            self.model = GenerativeModel(model_name=Config.MODEL_NAME)
-            print(f"Model {Config.MODEL_NAME} initialized successfully")
-        except Exception as e:
-            print(f"Error initializing models: {e}")
+            print(f"Error initializing Gemini client: {e}")
             raise e
     
     def analyze_flow_diagram(self, image_path):
         """Analyze flow diagram and extract information"""
         try:
-            if self.model is None:
-                raise Exception("Model not initialized. Check Gemini API configuration.")
+            if self.client is None:
+                raise Exception("Client not initialized. Check Gemini API configuration.")
             
             # Load and process image
             with open(image_path, 'rb') as image_file:
                 image_data = image_file.read()
             
-            # Convert to PIL Image
-            image = Image.open(io.BytesIO(image_data))
+            # Convert to base64 for API
+            image_base64 = base64.b64encode(image_data).decode('utf-8')
             
             # Prompt for diagram analysis
             prompt = """
@@ -69,18 +59,25 @@ class GeminiProcessor:
             }
             """
             
-            response = self.model.generate_content([prompt, image])
+            # Create PIL Image for API
+            image = Image.open(io.BytesIO(image_data))
+            
+            response = self.client.models.generate_content(
+                model=Config.MODEL_NAME,
+                contents=[prompt, image]
+            )
             
             # Parse JSON response
             try:
-                analysis = json.loads(response.text)
+                response_text = response.text if response.text else ""
+                analysis = json.loads(response_text)
             except json.JSONDecodeError:
                 # If JSON parsing fails, return structured response
                 analysis = {
                     "title": "Flow Diagram Analysis",
                     "description": "Analisis diagram berhasil diproses",
                     "elements": [],
-                    "process_flow": response.text,
+                    "process_flow": response_text,
                     "decision_points": [],
                     "inputs_outputs": {"input": [], "output": []},
                     "main_purpose": "Diagram telah dianalisis"
@@ -95,14 +92,19 @@ class GeminiProcessor:
     def generate_embeddings(self, text):
         """Generate embeddings for text using Gemini"""
         try:
+            if self.client is None:
+                raise Exception("Client not initialized. Check Gemini API configuration.")
+            
             # Use text embedding model
-            embedding = embed_content(
+            embedding = self.client.models.embed_content(
                 model=Config.EMBEDDING_MODEL,
-                content=text,
-                task_type="retrieval_document"
+                contents=[text]
             )
             
-            return embedding['embedding']
+            if embedding and embedding.embeddings:
+                return embedding.embeddings[0].values
+            else:
+                return None
             
         except Exception as e:
             print(f"Error generating embeddings: {e}")
@@ -111,8 +113,8 @@ class GeminiProcessor:
     def answer_question(self, question, diagram_analysis, context_embeddings=None):
         """Answer question about flow diagram"""
         try:
-            if self.model is None:
-                raise Exception("Model not initialized. Check Gemini API configuration.")
+            if self.client is None:
+                raise Exception("Client not initialized. Check Gemini API configuration.")
             
             # Create context from diagram analysis
             context = f"""
@@ -130,7 +132,10 @@ class GeminiProcessor:
             prompt = f"{context}\n\nPertanyaan: {question}\n\nJawaban:"
             
             start_time = time.time()
-            response = self.model.generate_content(prompt)
+            response = self.client.models.generate_content(
+                model=Config.MODEL_NAME,
+                contents=[prompt]
+            )
             response_time = time.time() - start_time
             
             return {

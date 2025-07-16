@@ -90,7 +90,7 @@ class VectorDatabaseManager:
                 raise Exception("Vector database not initialized. Check ChromaDB configuration.")
             
             results = self.collection.get(
-                where={"diagram_id": diagram_id},
+                where={"diagram_id": {"$eq": diagram_id}},
                 include=["documents", "metadatas", "embeddings"]
             )
             
@@ -108,7 +108,7 @@ class VectorDatabaseManager:
             
             # Get all embeddings for this diagram
             results = self.collection.get(
-                where={"diagram_id": diagram_id}
+                where={"diagram_id": {"$eq": diagram_id}}
             )
             
             if results['ids']:
@@ -153,9 +153,16 @@ class VectorDatabaseManager:
             if self.collection is None:
                 raise Exception("Vector database not initialized. Check ChromaDB configuration.")
             
-            where_clause = {"type": "qa_pair"}
+            # Format where clause properly for ChromaDB
             if diagram_id:
-                where_clause["diagram_id"] = diagram_id
+                where_clause = {
+                    "$and": [
+                        {"type": {"$eq": "qa_pair"}},
+                        {"diagram_id": {"$eq": diagram_id}}
+                    ]
+                }
+            else:
+                where_clause = {"type": {"$eq": "qa_pair"}}
             
             results = self.collection.query(
                 query_embeddings=[question_embedding],

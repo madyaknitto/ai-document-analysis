@@ -32,7 +32,7 @@ Aplikasi web full-stack yang memungkinkan pengguna untuk bertanya kepada AI tent
 
 1. **Clone repository atau download files**
 ```bash
-cd repository
+cd ai-document-analysis
 ```
 
 2. **Install dependencies**

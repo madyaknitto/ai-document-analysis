@@ -33,7 +33,6 @@ class QAHistory(Base):
     flow_diagram_id = Column(String, ForeignKey('flow_diagrams.id'), nullable=False)
     question = Column(Text, nullable=False)
     answer = Column(Text, nullable=False)
-    confidence_score = Column(String(50))
     response_time = Column(String(50))
     created_at = Column(DateTime, default=datetime.utcnow)
     

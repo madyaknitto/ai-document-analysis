@@ -4,6 +4,7 @@ import os
 from datetime import datetime
 import pandas as pd
 from PIL import Image
+import pytz
 
 # Import custom modules
 from config import Config
@@ -12,6 +13,15 @@ from database.models import FlowDiagram, QAHistory, VectorEmbedding
 from utils.ai_processor import GeminiProcessor
 from utils.vector_database import VectorDatabaseManager
 from utils.file_handler import FileHandler
+
+# Timezone configuration
+JAKARTA_TZ = pytz.timezone('Asia/Jakarta')
+
+def to_jakarta_time(dt):
+    """Convert UTC datetime to Jakarta time."""
+    if dt.tzinfo is None:
+        dt = pytz.utc.localize(dt)
+    return dt.astimezone(JAKARTA_TZ)
 
 # Page configuration
 st.set_page_config(
@@ -118,7 +128,7 @@ def home_page():
             st.markdown("**Diagram Terbaru**")
             if recent_diagrams:
                 for diagram in recent_diagrams:
-                    st.write(f"• {diagram.title} ({diagram.created_at.strftime('%d/%m/%Y %H:%M')})")
+                    st.write(f"• {diagram.title} ({to_jakarta_time(diagram.created_at).strftime('%d/%m/%Y %H:%M')})")
             else:
                 st.write("Belum ada diagram yang diupload")
         
@@ -126,7 +136,7 @@ def home_page():
             st.markdown("**Q&A Terbaru**")
             if recent_qa:
                 for qa in recent_qa:
-                    st.write(f"• {qa.question[:50]}... ({qa.created_at.strftime('%d/%m/%Y %H:%M')})")
+                    st.write(f"• {qa.question[:50]}... ({to_jakarta_time(qa.created_at).strftime('%d/%m/%Y %H:%M')})")
             else:
                 st.write("Belum ada pertanyaan")
     
@@ -251,46 +261,70 @@ def qa_page():
     # Get available diagrams
     try:
         session = db_manager.get_session()
-        diagrams = session.query(FlowDiagram).filter(FlowDiagram.processed == True).all()
+        # Order by title and then by creation date for consistent ordering
+        diagrams = session.query(FlowDiagram).filter(FlowDiagram.processed == True).order_by(FlowDiagram.title, FlowDiagram.created_at.desc()).all()
         session.close()
         
         if not diagrams:
             st.warning("Belum ada diagram yang tersedia. Silakan upload diagram terlebih dahulu.")
             return
+
+        # Group diagrams by title
+        diagrams_by_title = {}
+        for d in diagrams:
+            if d.title not in diagrams_by_title:
+                diagrams_by_title[d.title] = []
+            diagrams_by_title[d.title].append(d)
         
-        # Diagram selection
-        diagram_options = {f"{d.title} ({d.created_at.strftime('%d/%m/%Y')})": d for d in diagrams}
-        selected_diagram_key = st.selectbox("Pilih Diagram", list(diagram_options.keys()))
-        selected_diagram = diagram_options[selected_diagram_key]
+        diagram_titles = list(diagrams_by_title.keys())
         
-        # Display selected diagram
-        col1, col2 = st.columns([1, 2])
+        col1, col2 = st.columns(2)
         
         with col1:
-            file_path = str(selected_diagram.file_path)
-            if os.path.exists(file_path):
-                st.image(file_path, caption=str(selected_diagram.title), use_container_width=True)
-            else:
-                st.error("File diagram tidak ditemukan")
+            selected_title = st.selectbox("Pilih Nama Diagram", diagram_titles)
         
-        with col2:
-            st.markdown(f"**Judul:** {selected_diagram.title}")
-            st.markdown(f"**Deskripsi:** {selected_diagram.description or 'Tidak ada deskripsi'}")
-            st.markdown(f"**Upload:** {selected_diagram.created_at.strftime('%d/%m/%Y %H:%M')}")
-        
-        # Question input
-        st.markdown("---")
-        question = st.text_area("Tanyakan sesuatu tentang diagram ini:", 
-                               placeholder="Contoh: Bagaimana alur proses dimulai? Apa yang terjadi jika kondisi X terpenuhi?")
-        
-        if st.button("🤖 Tanya AI", type="primary"):
-            if question.strip():
-                answer_question(selected_diagram, question)
-            else:
-                st.error("Harap masukkan pertanyaan")
-        
-        # Previous Q&A for this diagram
-        display_qa_history(selected_diagram.id)
+        selected_diagram = None
+        if selected_title:
+            title_diagrams = diagrams_by_title[selected_title]
+            timestamp_options = {f"{to_jakarta_time(d.created_at).strftime('%d/%m/%Y %H:%M:%S')}": d for d in title_diagrams}
+            
+            with col2:
+                selected_timestamp_key = st.selectbox("Pilih Waktu Upload", list(timestamp_options.keys()))
+            
+            if selected_timestamp_key:
+                selected_diagram = timestamp_options[selected_timestamp_key]
+
+        # The rest of the page only renders if a diagram is fully selected.
+        if selected_diagram:
+            st.markdown("---")
+            # Display selected diagram
+            disp_col1, disp_col2 = st.columns([1, 2])
+            
+            with disp_col1:
+                file_path = str(selected_diagram.file_path)
+                if os.path.exists(file_path):
+                    st.image(file_path, caption=str(selected_diagram.title), use_container_width=True)
+                else:
+                    st.error("File diagram tidak ditemukan")
+            
+            with disp_col2:
+                st.markdown(f"**Judul:** {selected_diagram.title}")
+                st.markdown(f"**Deskripsi:** {selected_diagram.description or 'Tidak ada deskripsi'}")
+                st.markdown(f"**Upload:** {to_jakarta_time(selected_diagram.created_at).strftime('%d/%m/%Y %H:%M')}")
+            
+            # Question input
+            st.markdown("---")
+            question = st.text_area("Tanyakan sesuatu tentang diagram ini:", 
+                                   placeholder="Contoh: Bagaimana alur proses dimulai? Apa yang terjadi jika kondisi X terpenuhi?")
+            
+            if st.button("🤖 Tanya AI", type="primary"):
+                if question.strip():
+                    answer_question(selected_diagram, question)
+                else:
+                    st.error("Harap masukkan pertanyaan")
+            
+            # Previous Q&A for this diagram
+            display_qa_history(selected_diagram.id)
         
     except Exception as e:
         st.error(f"Error loading diagrams: {e}")
@@ -340,8 +374,6 @@ def answer_question(diagram, question):
                 col1, col2 = st.columns(2)
                 with col1:
                     st.caption(f"⏱️ Response time: {result['response_time']}")
-                with col2:
-                    st.caption(f"🎯 Confidence: {result['confidence_score']}")
                 
                 # Save to database
                 session = db_manager.get_session()
@@ -350,7 +382,6 @@ def answer_question(diagram, question):
                         flow_diagram_id=diagram.id,
                         question=question,
                         answer=result['answer'],
-                        confidence_score=result['confidence_score'],
                         response_time=result['response_time']
                     )
                     session.add(qa_record)
@@ -383,10 +414,10 @@ def display_qa_history(diagram_id):
         
         if qa_history:
             for qa in qa_history:
-                with st.expander(f"Q: {qa.question[:100]}... ({qa.created_at.strftime('%d/%m %H:%M')})"):
+                with st.expander(f"Q: {qa.question[:100]}... ({to_jakarta_time(qa.created_at).strftime('%d/%m %H:%M')})"):
                     st.write(f"**Pertanyaan:** {qa.question}")
                     st.write(f"**Jawaban:** {qa.answer}")
-                    st.caption(f"⏱️ {qa.response_time} | 🎯 {qa.confidence_score}")
+                    st.caption(f"⏱️ {qa.response_time}")
         else:
             st.info("Belum ada riwayat Q&A untuk diagram ini")
     
@@ -415,7 +446,7 @@ def display_diagram_history():
         
         if diagrams:
             for diagram in diagrams:
-                with st.expander(f"📄 {diagram.title} ({diagram.created_at.strftime('%d/%m/%Y %H:%M')})"):
+                with st.expander(f"📄 {diagram.title} ({to_jakarta_time(diagram.created_at).strftime('%d/%m/%Y %H:%M')})"):
                     col1, col2 = st.columns([1, 2])
                     
                     with col1:
@@ -450,10 +481,10 @@ def display_all_qa_history():
         
         if qa_history:
             for qa in qa_history:
-                with st.expander(f"❓ {qa.question[:100]}... ({qa.created_at.strftime('%d/%m/%Y %H:%M')})"):
+                with st.expander(f"❓ {qa.question[:100]}... ({to_jakarta_time(qa.created_at).strftime('%d/%m/%Y %H:%M')})"):
                     st.write(f"**Pertanyaan:** {qa.question}")
                     st.write(f"**Jawaban:** {qa.answer}")
-                    st.caption(f"⏱️ {qa.response_time} | 🎯 {qa.confidence_score}")
+                    st.caption(f"⏱️ {qa.response_time}")
         else:
             st.info("Belum ada riwayat Q&A")
     

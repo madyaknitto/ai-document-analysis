@@ -35,7 +35,7 @@ class GeminiProcessor:
                 image_data = image_file.read()
             
             # Convert to base64 for API
-            image_base64 = base64.b64encode(image_data).decode('utf-8')
+            # image_base64 = base64.b64encode(image_data).decode('utf-8')
             
             # Prompt for diagram analysis
             prompt = """
@@ -140,16 +140,14 @@ class GeminiProcessor:
             
             return {
                 "answer": response.text,
-                "response_time": f"{response_time:.2f}s",
-                "confidence_score": "High"  # Could implement confidence scoring
+                "response_time": f"{response_time:.2f}s"
             }
             
         except Exception as e:
             print(f"Error answering question: {e}")
             return {
                 "answer": "Maaf, terjadi kesalahan dalam memproses pertanyaan Anda.",
-                "response_time": "0s",
-                "confidence_score": "Low"
+                "response_time": "0s"
             }
     
     def find_similar_questions(self, question, qa_history):

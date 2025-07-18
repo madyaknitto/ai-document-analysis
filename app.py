@@ -222,8 +222,11 @@ def analyze_and_save_diagram(uploaded_file, title, description):
             
             # Analyze diagram
             analysis = ai_processor.analyze_flow_diagram(file_info['file_path'])
-            if not analysis:
-                st.error("Gagal menganalisis diagram")
+            if not analysis or analysis.get("error"):
+                st.error("Gagal menganalisis diagram.")
+                if analysis and analysis.get("raw_response"):
+                    st.error("Respons mentah dari AI:")
+                    st.code(analysis["raw_response"], language="text")
                 return
             
             # Generate embeddings
@@ -261,24 +264,36 @@ def analyze_and_save_diagram(uploaded_file, title, description):
                 
                 st.success("✅ Diagram berhasil dianalisis dan disimpan!")
                 
-                # Display analysis results
-                st.subheader("🔍 Hasil Analisis")
+                # Display analysis results in an editable table
+                st.subheader("🔍 Hasil Analisis (Dapat Diedit)")
                 
-                col1, col2 = st.columns(2)
-                with col1:
-                    st.markdown(f"**Judul:** {analysis.get('title', 'N/A')}")
-                    st.markdown(f"**Deskripsi:** {analysis.get('description', 'N/A')}")
-                    st.markdown(f"**Tujuan Utama:** {analysis.get('main_purpose', 'N/A')}")
+                st.info("Anda dapat mengedit hasil analisis AI di tabel di bawah ini. Perubahan belum disimpan.")
+
+                if 'analysis_data' not in st.session_state:
+                    st.session_state.analysis_data = analysis
+
+                # Display and edit top-level info
+                st.session_state.analysis_data['title'] = st.text_input(
+                    "Judul", 
+                    value=st.session_state.analysis_data.get('title', '')
+                )
+
+                # Display and edit nodes
+                edited_nodes = st.data_editor(
+                    st.session_state.analysis_data.get('nodes', []),
+                    num_rows="dynamic",
+                    use_container_width=True,
+                    key="node_editor"
+                )
                 
-                with col2:
-                    if analysis.get('decision_points'):
-                        st.markdown("**Decision Points:**")
-                        for point in analysis['decision_points']:
-                            st.write(f"• {point}")
+                st.session_state.analysis_data['nodes'] = edited_nodes
                 
-                if analysis.get('process_flow'):
-                    st.markdown("**Alur Proses:**")
-                    st.write(analysis['process_flow'])
+                # Add a button to save changes (functionality to be added)
+                if st.button("Simpan Perubahan"):
+                    st.warning("Fungsionalitas 'Simpan Perubahan' belum diimplementasikan.")
+                    # Here we would add the logic to update the database and embeddings
+                    # with st.session_state.analysis_data
+                    pass
                 
             except Exception as e:
                 session.rollback()
@@ -378,15 +393,7 @@ def answer_question(diagram, question):
             
             # Get analysis data
             analysis_text = diagram_embeddings['documents'][0]
-            
-            # Convert back to analysis format (simplified)
-            analysis_data = {
-                "title": diagram.title,
-                "description": diagram.description,
-                "process_flow": analysis_text,
-                "decision_points": [],
-                "main_purpose": "Analisis diagram"
-            }
+            analysis_data = json.loads(analysis_text)
             
             # Check for similar questions
             question_embedding = ai_processor.generate_embeddings(question)

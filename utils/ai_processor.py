@@ -30,36 +30,39 @@ class GeminiProcessor:
             if self.client is None:
                 raise Exception("Client not initialized. Check Gemini API configuration.")
             
-            # Load and process image
             with open(image_path, 'rb') as image_file:
                 image_data = image_file.read()
             
-            # Convert to base64 for API
-            # image_base64 = base64.b64encode(image_data).decode('utf-8')
-            
-            # Prompt for diagram analysis
             prompt = """
-            Analisis flow diagram berikut dengan detail:
-            
-            1. Identifikasi semua elemen diagram (kotak, panah, kondisi, dll)
-            2. Jelaskan alur proses dari awal hingga akhir
-            3. Sebutkan semua decision points dan alternatif jalur
-            4. Identifikasi input dan output dari setiap tahap
-            5. Jelaskan tujuan utama dari flow diagram ini
-            
-            Berikan analisis dalam format JSON dengan struktur:
+            Analisis gambar flow diagram ini secara teliti. Tugas Anda adalah mengubahnya menjadi objek JSON tunggal yang valid.
+            Output Anda HARUS HANYA berupa string JSON mentah, tanpa teks pembuka, penutup, atau format markdown.
+
+            Struktur JSON yang WAJIB diikuti:
             {
-                "title": "Judul diagram",
-                "description": "Deskripsi singkat",
-                "elements": ["list elemen-elemen diagram"],
-                "process_flow": "Penjelasan alur proses",
-                "decision_points": ["list decision points"],
-                "inputs_outputs": {"input": [], "output": []},
-                "main_purpose": "Tujuan utama diagram"
+              "flowchart_id": "string (opsional, jika ada di diagram Contohnya seperti 15A.29.8, 40C.12, 15B.29.8.1, dll.)",
+              "title": "string (judul utama diagram)",
+              "nodes": [
+                {
+                  "id": "string (ID unik untuk setiap node, e.g., 'start', 'step1', 'decisionA')",
+                  "type": "string (pilih dari: Start, End, Process, Decision, Popup, Connector)",
+                  "label": "string (teks yang terbaca di dalam node)",
+                  "details": "string (opsional, referensi atau detail tambahan, e.g., '[KN UI 1779]')",
+                  "next_node_id": "string (HANYA untuk node dengan satu alur keluar, berisi ID node tujuan)",
+                  "next_nodes": [
+                    { "condition": "string (label dari panah kondisi, e.g., 'Y', 'N', 'Valid')", "target_id": "string (ID node tujuan)" }
+                  ]
+                }
+              ]
             }
+
+            PERHATIKAN:
+            - Setiap node HARUS memiliki 'id' yang unik.
+            - Node 'Decision' HARUS menggunakan 'next_nodes' untuk merepresentasikan setiap cabang.
+            - Node 'Process' atau 'Popup' yang hanya punya satu panah keluar HARUS menggunakan 'next_node_id'.
+            - Node 'Connector' harus memiliki 'target_id' yang menunjuk ke 'id' node lain.
+            - Pastikan semua hubungan antar node tercermin dengan benar menggunakan 'next_node_id' atau 'next_nodes'.
             """
             
-            # Create PIL Image for API
             image = Image.open(io.BytesIO(image_data))
             
             response = self.client.models.generate_content(
@@ -67,20 +70,20 @@ class GeminiProcessor:
                 contents=[prompt, image]
             )
             
-            # Parse JSON response
+            response_text = response.text if response.text else ""
+            
+            # Clean the response text to remove markdown wrappers
+            if response_text.strip().startswith("```json"):
+                response_text = response_text.strip()[7:-3].strip()
+            
             try:
-                response_text = response.text if response.text else ""
                 analysis = json.loads(response_text)
             except json.JSONDecodeError:
-                # If JSON parsing fails, return structured response
-                analysis = {
-                    "title": "Flow Diagram Analysis",
-                    "description": "Analisis diagram berhasil diproses",
-                    "elements": [],
-                    "process_flow": response_text,
-                    "decision_points": [],
-                    "inputs_outputs": {"input": [], "output": []},
-                    "main_purpose": "Diagram telah dianalisis"
+                print(f"Failed to decode JSON from response: {response_text}")
+                # Return a structured error instead of the old format
+                return {
+                    "error": "Failed to parse JSON from model response.",
+                    "raw_response": response_text
                 }
             
             return analysis
@@ -117,16 +120,25 @@ class GeminiProcessor:
                 raise Exception("Client not initialized. Check Gemini API configuration.")
             
             # Create context from diagram analysis
+            analysis_json_string = json.dumps(diagram_analysis, indent=2)
+            
             context = f"""
-            Berdasarkan analisis flow diagram berikut:
+            Berdasarkan analisis flow diagram dalam format JSON berikut:
             
-            Judul: {diagram_analysis.get('title', 'N/A')}
-            Deskripsi: {diagram_analysis.get('description', 'N/A')}
-            Alur Proses: {diagram_analysis.get('process_flow', 'N/A')}
-            Decision Points: {', '.join(diagram_analysis.get('decision_points', []))}
-            Tujuan Utama: {diagram_analysis.get('main_purpose', 'N/A')}
+            {analysis_json_string}
             
-            Jawab pertanyaan berikut dengan akurat berdasarkan informasi diagram:
+            1. Jawab pertanyaan berikut dengan akurat berdasarkan informasi dari JSON di atas.
+            2. Jika ada Connector, maka sebutkan juga Node dan Label yang menjadi target_id dari Connector tersebut.
+            3. Ganti bahasa teknis menjadi bahasa yang bisa dimengerti seperti:
+                - node menjadi langkah
+                - condition menjadi kondisi
+                - label menjadi label
+                - next_node_id menjadi langkah selanjutnya
+                - next_nodes menjadi langkah selanjutnya
+                - target_id menjadi langkah selanjutnya
+                - kondisi Y menjadi Ya
+                - kondisi N menjadi Tidak
+            3. Jika pertanyaan tidak ada hubungannya dengan diagram, jawab dengan "Pertanyaan tidak dimengerti".
             """
             
             prompt = f"{context}\n\nPertanyaan: {question}\n\nJawaban:"

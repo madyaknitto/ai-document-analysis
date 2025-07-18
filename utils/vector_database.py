@@ -52,8 +52,7 @@ class VectorDatabaseManager:
                 metadatas=[{
                     "diagram_id": diagram_id,
                     "type": "diagram_analysis",
-                    "title": analysis_data.get("title", ""),
-                    "description": analysis_data.get("description", "")
+                    "title": analysis_data.get("title", "")
                 }],
                 ids=[f"diagram_{diagram_id}_{uuid.uuid4().hex[:8]}"]
             )
@@ -195,21 +194,6 @@ class VectorDatabaseManager:
     
     def _convert_analysis_to_text(self, analysis_data):
         """Convert analysis data to text format for embedding"""
-        text_parts = []
-        
-        if analysis_data.get("title"):
-            text_parts.append(f"Title: {analysis_data['title']}")
-        
-        if analysis_data.get("description"):
-            text_parts.append(f"Description: {analysis_data['description']}")
-        
-        if analysis_data.get("process_flow"):
-            text_parts.append(f"Process Flow: {analysis_data['process_flow']}")
-        
-        if analysis_data.get("decision_points"):
-            text_parts.append(f"Decision Points: {', '.join(analysis_data['decision_points'])}")
-        
-        if analysis_data.get("main_purpose"):
-            text_parts.append(f"Main Purpose: {analysis_data['main_purpose']}")
-        
-        return "\n".join(text_parts) 
+        # Serialize the entire JSON object to a string to be stored and embedded.
+        # This keeps all the structural information for later use.
+        return json.dumps(analysis_data, indent=2) 

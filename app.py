@@ -165,14 +165,50 @@ def upload_diagram_page():
         with col2:
             # Diagram information form
             st.subheader("Informasi Diagram")
-            title = st.text_input("Judul Diagram", value=uploaded_file.name.split('.')[0])
+
+            upload_type = st.radio(
+                "Pilih tipe unggah:",
+                ("New", "Update"),
+                horizontal=True
+            )
+
+            # Fetch existing titles once
+            session = db_manager.get_session()
+            existing_titles_query = session.query(FlowDiagram.title).distinct().order_by(FlowDiagram.title).all()
+            session.close()
+            title_list = [title[0] for title in existing_titles_query]
+
+            title = ""
+            button_label = ""
+
+            if upload_type == "New":
+                title = st.text_input("Judul Diagram Baru", value=uploaded_file.name.split('.')[0])
+                button_label = "Analisis Diagram Baru"
+            
+            elif upload_type == "Update":
+                if not title_list:
+                    st.warning("Belum ada diagram untuk di-update. Silakan buat diagram baru.")
+                    return
+                title = st.selectbox("Pilih Judul Diagram untuk Di-update", title_list)
+                button_label = "Update Diagram"
+
             description = st.text_area("Deskripsi", placeholder="Jelaskan tujuan diagram ini...")
             
-            if st.button("🔍 Analisis Diagram", type="primary"):
-                if title and title.strip():
-                    analyze_and_save_diagram(uploaded_file, title, description)
-                else:
-                    st.error("Harap isi judul diagram")
+            if st.button(f"🔍 {button_label}", type="primary"):
+                # General validation
+                if not title or not title.strip():
+                    st.error("Harap isi atau pilih judul diagram")
+                    return
+
+                # Specific validation for "New"
+                if upload_type == "New":
+                    # Case-insensitive check for duplicates
+                    if title.strip().lower() in [t.lower() for t in title_list]:
+                        st.error(f"Judul diagram '{title}' sudah ada. Silakan gunakan judul lain atau pilih 'Update'.")
+                        return
+                
+                # Proceed with analysis
+                analyze_and_save_diagram(uploaded_file, title.strip(), description)
 
 def analyze_and_save_diagram(uploaded_file, title, description):
     """Analyze and save diagram to database"""

@@ -1,0 +1,13 @@
+streamlit
+sqlalchemy
+python-dotenv
+google-genai
+chromadb
+pytz
+Pillow
+pdf2image
+PyMuPDF
+protobuf
+flask
+flask-cors
+requests

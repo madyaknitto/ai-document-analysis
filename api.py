@@ -268,7 +268,8 @@ def list_document_pages(document_id):
                 elements_data = [{
                     "id": el.id,
                     "element_type": el.element_type,
-                    "plain_text": el.plain_text
+                    "plain_text": el.plain_text,
+                    "content_json": el.content_json
                 } for el in page.elements]
 
                 pages_data.append({

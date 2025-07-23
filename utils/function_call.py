@@ -18,7 +18,7 @@ extract_all_text_schema = types.Schema(
             )
         )
     },
-    required=['all_text']
+    required=['all_text', 'explanation']
 )
 
 # 2. Schema untuk Flowchart
@@ -54,7 +54,7 @@ flowchart_schema = types.Schema(
         ),
         'explanation': types.Schema(type=types.Type.STRING, description='Penjelasan detail mengenai alur proses yang digambarkan oleh flowchart.')
     },
-    required=['nodes', 'edges']
+    required=['title', 'nodes', 'edges', 'explanation']
 )
 
 # Definisi Function Call Utama
@@ -68,7 +68,7 @@ analyze_document_page_tool = types.Tool(
                 properties={
                     'page_number': types.Schema(
                         type=types.Type.STRING,
-                        description='Nomor halaman yang terlihat di dokumen (cth: "1", "ii", "45").'
+                        description='Nomor halaman yang terlihat di dokumen (cth: "1", "ii", "45", "cover" (jika tidak ada nomor halaman)).'
                     ),
                     'extracted_text': extract_all_text_schema,
                     'flowchart': flowchart_schema,

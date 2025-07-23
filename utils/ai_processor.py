@@ -141,21 +141,29 @@ class AIProcessor:
         """Converts flowchart JSON to a readable text format."""
         parts = []
         if flowchart_content.get('title'):
-            parts.append(flowchart_content['title'])
+            # Bersihkan newline dalam title
+            title = flowchart_content['title'].replace('\n', ' ').strip()
+            parts.append(title)
         
         for node in flowchart_content.get('nodes', []):
-            parts.append(f"Node ({node.get('shape', '')}): {node.get('label', '')}")
+            # Bersihkan newline dalam label node
+            label = node.get('label', '').replace('\n', ' ').strip()
+            parts.append(f"Node ({node.get('shape', '')}): {label}")
             
         if flowchart_content.get('edges'):
             parts.append("\nAlur:")
             for edge in flowchart_content.get('edges', []):
                 edge_text = f"  Dari {edge.get('from_node', '')} ke {edge.get('to_node', '')}"
                 if edge.get('label'):
-                    edge_text += f" dengan label '{edge.get('label')}'"
+                    # Bersihkan newline dalam label edge
+                    edge_label = edge.get('label').replace('\n', ' ').strip()
+                    edge_text += f" dengan label '{edge_label}'"
                 parts.append(edge_text)
         
         if flowchart_content.get('explanation'):
-            parts.append(f"\nPenjelasan: {flowchart_content['explanation']}")
+            # Bersihkan newline dalam explanation
+            explanation = flowchart_content['explanation'].replace('\n', ' ').strip()
+            parts.append(f"\nPenjelasan: {explanation}")
             
         return "\n".join(parts)
 
@@ -171,7 +179,7 @@ class AIProcessor:
             print(f"Error calling Gemini API: {e}")
             return f"Error: {str(e)}"
 
-    def generate_embeddings(self, text):
+    def generate_embeddings(self, text, task_type="RETRIEVAL_DOCUMENT"):
         """Generate embeddings for text using Gemini with retry logic"""
         try:
             # Validasi input text
@@ -179,18 +187,15 @@ class AIProcessor:
                 print("Warning: Empty text provided for embedding generation")
                 return None
             
-            # Truncate text jika terlalu panjang (Gemini embedding model memiliki batas)
-            max_text_length = 2048  # Batas aman untuk embedding model
-            if len(text) > max_text_length:
-                print(f"Warning: Text too long ({len(text)} chars), truncating to {max_text_length} chars")
-                text = text[:max_text_length]
-            
             def embedding_api_call():
                 # Tambahkan delay kecil untuk menghindari rate limiting
                 time.sleep(0.1)
                 return self.client.models.embed_content(
                     model=Config.EMBEDDING_MODEL,
-                    contents=[text]
+                    contents=[text],
+                    config=types.EmbedContentConfig(
+                        task_type=task_type,
+                    )
                 )
             
             # Gunakan retry logic yang sudah ada
@@ -253,6 +258,7 @@ PETUNJUK JAWABAN:
 
 JAWABAN:"""
 
+            print(prompt)
             return self.call_gemini_api(prompt)
             
         except Exception as e:

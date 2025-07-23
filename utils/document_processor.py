@@ -228,7 +228,7 @@ class DocumentProcessor:
         Search for similar content, boost flowcharts, and return only the top-scoring element per page.
         """
         try:
-            query_embedding = self.ai_processor.generate_embeddings(query)
+            query_embedding = self.ai_processor.generate_embeddings(query, task_type="RETRIEVAL_QUERY")
             if not query_embedding:
                 return []
             
@@ -236,7 +236,7 @@ class DocumentProcessor:
             initial_results = self.vector_db.search_similar_elements(
                 query_embedding=query_embedding,
                 document_id=document_id,
-                top_k=top_k * 2  # Ambil dua kali lipat dari yang dibutuhkan
+                top_k=top_k
             )
             
             if not initial_results or not initial_results.get('metadatas') or not initial_results['metadatas'][0]:
@@ -285,7 +285,7 @@ class DocumentProcessor:
             final_results = list(top_elements_per_page.values())
             final_results.sort(key=lambda x: (x['similarity_score']), reverse=True)
             
-            return final_results[:3]
+            return final_results[:1]
             
         except Exception as e:
             print(f"Error searching similar content: {e}")

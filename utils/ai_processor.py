@@ -99,8 +99,8 @@ class AIProcessor:
                         
                         # 1. Ekstrak dan Gabungkan Teks dan Penjelasan
                         if 'extracted_text' in args:
-                            text_content = args['extracted_text'].get('all_text', '')
-                            explanation_content = args['extracted_text'].get('explanation', '')
+                            text_content = args['extracted_text'].get('all_text', '').replace('\n', ' ').strip()
+                            explanation_content = args['extracted_text'].get('explanation', '').replace('\n', ' ').strip()
                             
                             # Gabungkan untuk embedding
                             combined_plain_text = f"{text_content} \n\nPenjelasan: {explanation_content}".strip()

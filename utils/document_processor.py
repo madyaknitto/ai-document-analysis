@@ -258,7 +258,7 @@ class DocumentProcessor:
                         similarity_score = 1 - initial_results['distances'][0][i]
                         
                         if element.element_type == 'FLOWCHART':
-                            similarity_score *= 1.1
+                            similarity_score *= 1.05
                             similarity_score = min(similarity_score, 1.0)
 
                         if similarity_score > 0.5:
@@ -285,7 +285,7 @@ class DocumentProcessor:
             final_results = list(top_elements_per_page.values())
             final_results.sort(key=lambda x: (x['similarity_score']), reverse=True)
             
-            return final_results[:1]
+            return final_results[:2]
             
         except Exception as e:
             print(f"Error searching similar content: {e}")

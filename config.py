@@ -19,7 +19,7 @@ class Config:
     APP_ICON = "🔄"
     
     # AI Configuration
-    MODEL_NAME = "gemini-1.5-flash"  # Supports multimodal (text + image)
+    MODEL_NAME = "gemini-2.0-flash"  # Supports multimodal (text + image)
     EMBEDDING_MODEL = "text-embedding-004"
     
     # Maximum file size for uploads (in MB)

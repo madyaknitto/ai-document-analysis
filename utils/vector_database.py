@@ -275,3 +275,50 @@ class VectorDatabaseManager:
         except Exception as e:
             print(f"Force reset failed: {e}")
             return False
+    
+    def get_document_stats(self, document_id):
+        """Get statistics for a specific document"""
+        try:
+            if not self.is_healthy():
+                return {"error": "Vector database not healthy"}
+            
+            # Get all embeddings for this document
+            results = self.collection.get(
+                where={"document_id": document_id},
+                include=["metadatas", "embeddings"]
+            )
+            
+            if not results['ids']:
+                return {
+                    "total_embeddings": 0,
+                    "pages": {},
+                    "element_types": {}
+                }
+            
+            # Count embeddings per page and element type
+            pages = {}
+            element_types = {}
+            
+            for i, metadata in enumerate(results['metadatas']):
+                page_num = metadata.get('page_number')
+                element_type = metadata.get('element_type', 'unknown')
+                
+                # Count by page
+                if page_num not in pages:
+                    pages[page_num] = 0
+                pages[page_num] += 1
+                
+                # Count by element type
+                if element_type not in element_types:
+                    element_types[element_type] = 0
+                element_types[element_type] += 1
+            
+            return {
+                "total_embeddings": len(results['ids']),
+                "pages": pages,
+                "element_types": element_types
+            }
+            
+        except Exception as e:
+            print(f"Error getting document stats: {e}")
+            return {"error": str(e)}

@@ -28,6 +28,7 @@ class Config:
     @classmethod
     def validate_config(cls):
         """Validate that all required configuration is present"""
+        print(cls.GEMINI_API_KEY)
         if not cls.GEMINI_API_KEY:
             raise ValueError("GEMINI_API_KEY tidak ditemukan. Silakan tambahkan ke file .env")
         

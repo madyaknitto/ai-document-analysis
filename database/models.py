@@ -15,49 +15,10 @@ class Document(Base):
     uploaded_at = Column(DateTime, default=datetime.utcnow)
     
     # Relationships
-    pages = relationship("DocumentPage", back_populates="document", cascade="all, delete-orphan")
     qa_history = relationship("QAHistory", back_populates="document", cascade="all, delete-orphan")
     
     def __repr__(self):
         return f"<Document(document_id='{self.document_id}', filename='{self.filename}')>"
-
-class DocumentPage(Base):
-    __tablename__ = 'document_pages'
-    
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    document_id = Column(String(100), ForeignKey('documents.document_id', ondelete='CASCADE'), nullable=False)
-    page_number = Column(Integer, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    
-    # Relationships
-    document = relationship("Document", back_populates="pages")
-    elements = relationship("PageElement", back_populates="page", cascade="all, delete-orphan")
-    
-    def __repr__(self):
-        return f"<DocumentPage(id={self.id}, document_id='{self.document_id}', page={self.page_number})>"
-
-class PageElement(Base):
-    """
-    Model untuk menyimpan elemen-elemen yang diekstrak dari halaman dokumen.
-    
-    Element Types:
-    - ALL_TEXT: Seluruh teks yang diekstrak dari halaman, dapat mencakup penjelasan konten yang dihasilkan AI.
-    - FLOWCHART: Diagram alur yang diekstrak.
-    """
-    __tablename__ = 'page_elements'
-    
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    page_id = Column(Integer, ForeignKey('document_pages.id', ondelete='CASCADE'), nullable=False)
-    element_type = Column(String(50), nullable=False)  # 'ALL_TEXT', 'FLOWCHART'
-    content_json = Column(Text)  # JSON string untuk konten (teks gabungan, atau flowchart)
-    plain_text = Column(Text)  # Teks yang bisa di-embedding untuk vector search
-    created_at = Column(DateTime, default=datetime.utcnow)
-    
-    # Relationships
-    page = relationship("DocumentPage", back_populates="elements")
-    
-    def __repr__(self):
-        return f"<PageElement(id={self.id}, type='{self.element_type}')>"
 
 class QAHistory(Base):
     __tablename__ = 'qa_history'

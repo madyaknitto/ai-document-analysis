@@ -50,30 +50,6 @@ class DatabaseManager:
                     )
                 """))
                 
-                # Create document_pages table
-                conn.execute(text("""
-                    CREATE TABLE IF NOT EXISTS document_pages (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        document_id INTEGER,
-                        page_number INTEGER,
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                    )
-                """))
-                
-                # Create page_elements table
-                conn.execute(text("""
-                    CREATE TABLE IF NOT EXISTS page_elements (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        page_id INTEGER,
-                        element_type TEXT,
-                        change_status TEXT,
-                        content_json TEXT,
-                        plain_text TEXT,
-                        embedding_id TEXT,
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                    )
-                """))
-                
                 # Create qa_history table
                 conn.execute(text("""
                     CREATE TABLE IF NOT EXISTS qa_history (
@@ -84,7 +60,8 @@ class DatabaseManager:
                         response_time VARCHAR(50),
                         similarity_score FLOAT,
                         page_references TEXT,
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY (document_id) REFERENCES documents(document_id) ON DELETE CASCADE
                     )
                 """))
                 
@@ -97,16 +74,14 @@ class DatabaseManager:
     
     def get_session(self):
         """Get database session"""
-        if not self.SessionLocal:
-            raise Exception("Database not initialized")
         return self.SessionLocal()
     
-    def close(self):
-        """Close database connection"""
-        if self.engine:
-            self.engine.dispose()
+    def close_session(self, session):
+        """Close database session"""
+        if session:
+            session.close()
 
-# Global database manager instance
+# Create global instance
 db_manager = DatabaseManager()
 
  
